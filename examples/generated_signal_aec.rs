@@ -16,7 +16,7 @@
 
 use fdaf_aec::FdafAec;
 use hound;
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 
 const SAMPLE_RATE: u32 = 16000;
 const DURATION_S: u32 = 5;
@@ -32,11 +32,11 @@ fn main() {
     let mut aec = FdafAec::<FFT_SIZE>::new(STEP_SIZE);
 
     // --- 1. Signal Generation ---
-    let mut rng = thread_rng();
+    let mut rng = rng();
 
     // Far-end signal (white noise) to simulate a generic, broadband audio source.
     let far_end_signal: Vec<f32> = (0..TOTAL_SAMPLES)
-        .map(|_| rng.r#gen::<f32>() * 0.6 - 0.3) // Lower amplitude noise
+        .map(|_| rng.random::<f32>() * 0.6 - 0.3) // Lower amplitude noise
         .collect();
 
     // Near-end signal (440Hz sine wave, from 2s to 4s) to simulate a user speaking.
