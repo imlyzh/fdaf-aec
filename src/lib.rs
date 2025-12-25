@@ -1,6 +1,6 @@
-use nalgebra::{DVector, DVectorView};
+use nalgebra::{ComplexField, DVector, DVectorView};
 use num_complex::Complex;
-use rustfft::{Fft, FftPlanner};
+use rustfft::{Fft, FftPlanner, num_traits::Zero};
 use std::sync::Arc;
 
 /// Implements an Acoustic Echo Canceller using the Frequency Domain Adaptive Filter (FDAF)
@@ -46,14 +46,14 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
         Self {
             fft,
             ifft,
-            weights: DVector::from_element(FFT_SIZE, Complex::new(0.0, 0.0)),
+            weights: DVector::from_element(FFT_SIZE, Complex::zero()),
             far_end_buffer: DVector::from_element(FFT_SIZE, 0.0),
-            x_t_buffer: [Complex::new(0.0, 0.0); FFT_SIZE],
-            e_t_buffer: [Complex::new(0.0, 0.0); FFT_SIZE],
+            x_t_buffer: [Complex::zero(); FFT_SIZE],
+            e_t_buffer: [Complex::zero(); FFT_SIZE],
             psd: DVector::from_element(FFT_SIZE, 1.0), // Initialize with 1 to avoid division by zero
             y_t: DVector::zeros(FFT_SIZE),
             mu: step_size,
-            smoothing_factor: 0.98,
+            smoothing_factor: 0.9,
         }
     }
 
@@ -107,9 +107,9 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
         self.ifft.process(&mut y_t_complex);
 
         // IFFT normalization and extract real part
-        let fft_size_f32 = FFT_SIZE as f32;
+        let scale = 1.0 / (FFT_SIZE as f32);
         for (idx, c) in y_t_complex.iter().enumerate() {
-            self.y_t[idx] = c.re / fft_size_f32;
+            self.y_t[idx] = c.re.scale(scale);
         }
 
         // 6. Extract the valid part of the convolution (Overlap-Save method)
@@ -123,7 +123,7 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
         // 8. FFT of the error signal for weight update
         // The error signal is placed in the second half of the buffer (the first half
         // is zero-padded) to ensure correct time alignment for the gradient calculation.
-        self.e_t_buffer = [Complex::new(0.0, 0.0); FFT_SIZE];
+        self.e_t_buffer = [Complex::zero(); FFT_SIZE];
         for (i, &sample) in error_signal.iter().enumerate() {
             self.e_t_buffer[i + FRAME_SIZE] = Complex::new(sample, 0.0);
         }
@@ -133,10 +133,26 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
 
         // 9. Update filter weights using Normalized LMS algorithm
         let mut gradient = x_f.map(|c| c.conj()).component_mul(&e_f);
+
         for i in 0..FFT_SIZE {
             // Normalize by the PSD of the far-end signal
-            gradient[i] /= self.psd[i] + 1e-10; // Add a small epsilon for stability
+            gradient[i] /= self.psd[i] + 1e-10;
         }
+
+        // modified
+
+        self.ifft.process(gradient.as_mut_slice());
+
+        for i in 0..FFT_SIZE {
+            if i < FRAME_SIZE {
+                gradient[i] *= scale;
+            } else {
+                gradient[i] = Complex::zero();
+            }
+        }
+
+        self.fft.process(gradient.as_mut_slice());
+
         self.weights += &gradient * Complex::new(self.mu, 0.0);
     }
 }
