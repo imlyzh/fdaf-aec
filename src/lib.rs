@@ -1,6 +1,6 @@
 use nalgebra::{ComplexField, DVector, DVectorView};
 use num_complex::Complex;
-use rustfft::{Fft, FftPlanner, num_traits::Zero};
+use rustfft::{num_traits::Zero, Fft, FftPlanner};
 use std::sync::Arc;
 
 /// Implements an Acoustic Echo Canceller using the Frequency Domain Adaptive Filter (FDAF)
@@ -103,8 +103,8 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
         let mut y_f = self.weights.component_mul(&x_f);
 
         // 5. Inverse FFT of the estimated echo
-        let mut y_t_complex = y_f.as_mut_slice();
-        self.ifft.process(&mut y_t_complex);
+        let y_t_complex = y_f.as_mut_slice();
+        self.ifft.process(y_t_complex);
 
         // IFFT normalization and extract real part
         let scale = 1.0 / (FFT_SIZE as f32);
