@@ -21,9 +21,9 @@
 //! ```
 //! The `--release` flag is recommended for faster processing.
 
-use fdaf_aec::FdafAec;
-use hound::{WavReader, WavWriter, WavSpec};
 use clap::Parser;
+use fdaf_aec::FdafAec;
+use hound::{WavReader, WavSpec, WavWriter};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -60,29 +60,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- 1. Load WAV files ---
     let (far_signal, spec) = read_wav(&args.farend)?;
     let (mic_signal, _) = read_wav(&args.mic)?;
-    
+
     if spec.channels != 1 || spec.sample_rate != 16000 {
         eprintln!("Warning: For best results, input WAV files should be mono, 16kHz.");
-        eprintln!("Current spec: {} channels, {} Hz", spec.channels, spec.sample_rate);
+        eprintln!(
+            "Current spec: {} channels, {} Hz",
+            spec.channels, spec.sample_rate
+        );
     }
-    
+
     // --- 2. Initialize AEC ---
-    let mut aec = FdafAec::new(FFT_SIZE, args.step_size);
+    let mut aec = FdafAec::<FFT_SIZE>::new(args.step_size);
 
     // --- 3. Process Signals Frame by Frame ---
-    let mut processed_signal = Vec::new();
+    let mut processed_signal: Vec<f32> = Vec::new();
     let num_samples = mic_signal.len().min(far_signal.len());
 
     for i in (0..num_samples).step_by(FRAME_SIZE) {
-        if i + FRAME_SIZE > num_samples { break; }
+        if i + FRAME_SIZE > num_samples {
+            break;
+        }
 
         let far_frame = &far_signal[i..i + FRAME_SIZE];
         let mic_frame = &mic_signal[i..i + FRAME_SIZE];
+        let mut output_frame = [0.0; FRAME_SIZE];
 
-        let output_frame = aec.process(far_frame, mic_frame);
+        aec.process(
+            output_frame.first_chunk_mut::<FRAME_SIZE>().unwrap(),
+            far_frame.first_chunk::<FRAME_SIZE>().unwrap(),
+            mic_frame.first_chunk::<FRAME_SIZE>().unwrap(),
+        );
         processed_signal.extend_from_slice(&output_frame);
     }
-    
+
     // --- 4. Save Output WAV File ---
     let mut writer = WavWriter::create(&args.output, spec)?;
     for &sample in processed_signal.iter() {
@@ -101,9 +111,10 @@ fn read_wav(path: &PathBuf) -> Result<(Vec<f32>, WavSpec), Box<dyn std::error::E
     let spec = reader.spec();
     let max_val = 2_i32.pow(spec.bits_per_sample as u32 - 1) as f32;
 
-    let samples = reader.samples::<i32>()
+    let samples = reader
+        .samples::<i32>()
         .map(|s| s.unwrap() as f32 / max_val)
         .collect();
-    
+
     Ok((samples, spec))
-} 
+}
