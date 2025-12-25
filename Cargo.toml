@@ -1,13 +1,13 @@
 [package]
 name = "fdaf-aec"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "An Acoustic Echo Canceller (AEC) using the Frequency Domain Adaptive Filter (FDAF) algorithm."
 keywords = ["aec", "audio", "dsp", "echo", "cancellation"]
 categories = ["multimedia::audio", "algorithms"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/deeptrue-org/fdaf-aec" 
+repository = "https://github.com/deeptrue-org/fdaf-aec"
 
 [dependencies]
 nalgebra = "0.32.3"
