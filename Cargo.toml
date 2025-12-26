@@ -1,6 +1,6 @@
 [package]
 name = "fdaf-aec"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "An Acoustic Echo Canceller (AEC) using the Frequency Domain Adaptive Filter (FDAF) algorithm."
 keywords = ["aec", "audio", "dsp", "echo", "cancellation"]

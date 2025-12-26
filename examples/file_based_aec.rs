@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // --- 2. Initialize AEC ---
-    let mut aec = FdafAec::<FFT_SIZE>::new(args.step_size);
+    let mut aec = FdafAec::<FFT_SIZE>::new(0.5, 0.9, 10e-4);
 
     // --- 3. Process Signals Frame by Frame ---
     let mut processed_signal: Vec<f32> = Vec::new();

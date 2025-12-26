@@ -18,6 +18,7 @@ pub struct FdafAec<const FFT_SIZE: usize> {
     psd: DVector<f32>,
     mu: f32,
     smoothing_factor: f32,
+    regularization_factor: f32,
 }
 
 impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
@@ -34,7 +35,7 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
     /// * `step_size`: The learning rate (mu) for the adaptive filter. It controls how fast the
     ///   filter adapts. A larger value leads to faster convergence but can be less stable.
     ///   A typical value is between 0.1 and 1.0.
-    pub fn new(step_size: f32) -> Self {
+    pub fn new(step_size: f32, smoothing_factor: f32, regularization_factor: f32) -> Self {
         assert!(
             Self::FRAME_SIZE > 0 && Self::FRAME_SIZE.is_power_of_two(),
             "FRAME_SIZE must be a power of two."
@@ -53,7 +54,8 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
             psd: DVector::from_element(FFT_SIZE, 1.0), // Initialize with 1 to avoid division by zero
             y_t: DVector::zeros(FFT_SIZE),
             mu: step_size,
-            smoothing_factor: 0.9,
+            smoothing_factor,
+            regularization_factor,
         }
     }
 
@@ -134,12 +136,12 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
         // 9. Update filter weights using Normalized LMS algorithm
         let mut gradient = x_f.map(|c| c.conj()).component_mul(&e_f);
 
+        // modified
+
         for i in 0..FFT_SIZE {
             // Normalize by the PSD of the far-end signal
-            gradient[i] /= self.psd[i] + 1e-10;
+            gradient[i] /= self.psd[i] + self.regularization_factor;
         }
-
-        // modified
 
         self.ifft.process(gradient.as_mut_slice());
 
@@ -165,9 +167,8 @@ mod tests {
     fn new_instance_and_process_frame() {
         const FFT_SIZE: usize = 512;
         const FRAME_SIZE: usize = FFT_SIZE / 2;
-        const STEP_SIZE: f32 = 0.5;
 
-        let mut aec = FdafAec::<FFT_SIZE>::new(STEP_SIZE);
+        let mut aec = FdafAec::<FFT_SIZE>::new(0.5, 0.9, 10e-4);
 
         let far_end_frame = vec![0.0; FRAME_SIZE];
         let mic_frame = vec![0.1; FRAME_SIZE]; // Some non-zero value
@@ -188,13 +189,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_new_with_non_power_of_two_fft_size() {
-        FdafAec::<511>::new(0.5);
+        FdafAec::<511>::new(0.5, 0.9, 10e-4);
     }
 
     #[test]
     #[should_panic]
     fn test_process_with_wrong_frame_size() {
-        let mut aec = FdafAec::<512>::new(0.5);
+        let mut aec = FdafAec::<512>::new(0.5, 0.9, 10e-4);
         let far_end_frame = vec![0.0; 128];
         let mic_frame = vec![0.0; 256];
         let mut error_signal = vec![0.0; 256];

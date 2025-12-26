@@ -18,9 +18,8 @@ fn main() {
     const SAMPLE_RATE: u32 = 16000;
     const FFT_SIZE: usize = 1024;
     const FRAME_SIZE: usize = FFT_SIZE / 2;
-    const STEP_SIZE: f32 = 0.05;
 
-    let mut aec = FdafAec::<FFT_SIZE>::new(STEP_SIZE);
+    let mut aec = FdafAec::<FFT_SIZE>::new(0.5, 0.9, 10e-4);
 
     // --- Signal Generation ---
     // 1. Far-end signal: A 440Hz sine wave, representing the audio from the loudspeaker.
