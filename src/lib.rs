@@ -1,12 +1,19 @@
+#![no_std]
+extern crate alloc;
+
+use alloc::sync::Arc;
+#[allow(unused)]
+use alloc::vec;
+
 use nalgebra::{ComplexField, DVector, DVectorView};
 use num_complex::Complex;
 use rustfft::{num_traits::Zero, Fft, FftPlanner};
-use std::sync::Arc;
 
 /// Implements an Acoustic Echo Canceller using the Frequency Domain Adaptive Filter (FDAF)
 /// algorithm with the Overlap-Save method.
 ///
 /// This struct holds the state for the AEC and processes audio in frames.
+#[derive(Clone)]
 pub struct FdafAec<const FFT_SIZE: usize> {
     fft: Arc<dyn Fft<f32>>,
     ifft: Arc<dyn Fft<f32>>,
