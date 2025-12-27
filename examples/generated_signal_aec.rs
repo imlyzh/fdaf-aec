@@ -29,7 +29,7 @@ fn main() {
     const STEP_SIZE: f32 = 0.02;
     const TOTAL_SAMPLES: usize = (SAMPLE_RATE * DURATION_S) as usize;
 
-    let mut aec = FdafAec::<FFT_SIZE>::new(STEP_SIZE, 0.9, 10e-4);
+    let mut aec = FdafAec::<FFT_SIZE>::new(STEP_SIZE, 0.9, 10e-4, 10e-4);
 
     // --- 1. Signal Generation ---
     let mut rng = rng();

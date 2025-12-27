@@ -19,6 +19,7 @@ pub struct FdafAec<const FFT_SIZE: usize> {
     mu: f32,
     smoothing_factor: f32,
     regularization_factor: f32,
+    leak: f32,
 }
 
 impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
@@ -35,7 +36,12 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
     /// * `step_size`: The learning rate (mu) for the adaptive filter. It controls how fast the
     ///   filter adapts. A larger value leads to faster convergence but can be less stable.
     ///   A typical value is between 0.1 and 1.0.
-    pub fn new(step_size: f32, smoothing_factor: f32, regularization_factor: f32) -> Self {
+    pub fn new(
+        step_size: f32,
+        smoothing_factor: f32,
+        regularization_factor: f32,
+        leak: f32,
+    ) -> Self {
         assert!(
             Self::FRAME_SIZE > 0 && Self::FRAME_SIZE.is_power_of_two(),
             "FRAME_SIZE must be a power of two."
@@ -56,6 +62,7 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
             mu: step_size,
             smoothing_factor,
             regularization_factor,
+            leak,
         }
     }
 
@@ -155,6 +162,8 @@ impl<const FFT_SIZE: usize> FdafAec<FFT_SIZE> {
 
         self.fft.process(gradient.as_mut_slice());
 
+        let factor = 1.0 - self.leak;
+        self.weights.iter_mut().for_each(|i| *i *= factor);
         self.weights += &gradient * Complex::new(self.mu, 0.0);
     }
 }
@@ -168,7 +177,7 @@ mod tests {
         const FFT_SIZE: usize = 512;
         const FRAME_SIZE: usize = FFT_SIZE / 2;
 
-        let mut aec = FdafAec::<FFT_SIZE>::new(0.5, 0.9, 10e-4);
+        let mut aec = FdafAec::<FFT_SIZE>::new(0.5, 0.9, 10e-4, 10e-4);
 
         let far_end_frame = vec![0.0; FRAME_SIZE];
         let mic_frame = vec![0.1; FRAME_SIZE]; // Some non-zero value
@@ -189,13 +198,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_new_with_non_power_of_two_fft_size() {
-        FdafAec::<511>::new(0.5, 0.9, 10e-4);
+        FdafAec::<511>::new(0.5, 0.9, 10e-4, 10e-4);
     }
 
     #[test]
     #[should_panic]
     fn test_process_with_wrong_frame_size() {
-        let mut aec = FdafAec::<512>::new(0.5, 0.9, 10e-4);
+        let mut aec = FdafAec::<512>::new(0.5, 0.9, 10e-4, 10e-4);
         let far_end_frame = vec![0.0; 128];
         let mic_frame = vec![0.0; 256];
         let mut error_signal = vec![0.0; 256];
